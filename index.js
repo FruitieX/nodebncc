@@ -33,8 +33,17 @@ var handleMessage = function(message) {
     initChan(message.channel);
 
     ircChans[message.channel].messages.push(message);
-    io.sockets.in(message.channel).emit(message);
+    io.sockets.in(message.channel).emit('message', message);
     console.log('got msg on ' + message.channel);
+};
+
+var handleNickList = function(channel, nickList) {
+    console.log('got nick list for ' + channel + ':');
+    console.log(nickList);
+    initChan(channel);
+
+    ircChans[channel].nicks = nickList;
+    io.sockets.in(channel).emit('nickList', [channel, nickList]);
 };
 
 bncSocket.on('connect', function() {
@@ -49,9 +58,13 @@ bncSocket.on('connect', function() {
             });
         });
     });
-    bncSocket.on('nickList', function(data) {
-        console.log('got nick list for ' + data.channel + ':');
-        console.log(data.nickList);
+    bncSocket.on('nickLists', function(channels) {
+        _.each(channels, function(nickList, channel) {
+            handleNickList(channel, nickList);
+        });
+    });
+    bncSocket.on('nickList', function(nickList) {
+        handleNickList(channel, nickList);
     });
     bncSocket.on('message', handleMessage);
     bncSocket.on('bncErr', function(err) {
