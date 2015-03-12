@@ -1,30 +1,60 @@
 var fs = require('fs');
-var config = require(process.env.HOME + '/.nodebnc/config.json');
+var config = require(process.env.HOME + '/.nodebncc/config.json');
+var bncConfig = require(process.env.HOME + '/.nodebnc/config.json');
+var _ = require('underscore');
 
-var options = {
-    tls: config.tls,
+var bncOptions = {
+    tls: bncConfig.tls,
     key: fs.readFileSync(process.env.HOME + '/.nodebnc/nodebnc-key.pem'),
     cert: fs.readFileSync(process.env.HOME + '/.nodebnc/nodebnc-cert.pem'),
     ca: fs.readFileSync(process.env.HOME + '/.nodebnc/nodebnc-cert.pem'),
-    rejectUnauthorized: config.rejectUnauthorized
+    rejectUnauthorized: bncConfig.rejectUnauthorized
 };
 
-var socket = require('socket.io-client')((config.tls ? 'https://' : 'http://') + config.hostname + ':' + config.port, options);
+var bncSocket = require('socket.io-client')((bncConfig.tls ? 'https://' : 'http://') + bncConfig.hostname + ':' + bncConfig.port, bncOptions);
 
-socket.on('connect', function() {
+var httpServer = require('http')
+.createServer().listen(config.port, 'localhost');
+var io = require('socket.io')(httpServer);
+
+var ircChans = {};
+
+var initChan = function(channel) {
+    if(channel && !ircChans[channel]) {
+        ircChans[channel] = {
+            messages: [],
+            nicks: []
+        };
+    }
+};
+
+var handleMessage = function(message) {
+    console.log(message);
+    initChan(message.channel);
+
+    ircChans[message.channel].messages.push(message);
+    io.sockets.in(message.channel).emit(message);
+    console.log('got msg on ' + message.channel);
+};
+
+bncSocket.on('connect', function() {
     console.log('connected');
-    socket.emit('backlog', {
-        channel: '#fruittest',
-        server: 'qnet',
+    bncSocket.emit('refreshState', {
         limit: config.backlog
     });
-    socket.on('backlog', function(messages) {
-        console.log(messages);
+    bncSocket.on('messages', function(channels) {
+        _.each(channels, function(channel) {
+            _.each(channel.messages, function(message) {
+                handleMessage(message);
+            });
+        });
     });
-    socket.on('message', function(message) {
-        console.log(message);
+    bncSocket.on('nickList', function(data) {
+        console.log('got nick list for ' + data.channel + ':');
+        console.log(data.nickList);
     });
-    socket.on('error', function(err) {
-        console.log('error! ' + err);
+    bncSocket.on('message', handleMessage);
+    bncSocket.on('bncErr', function(err) {
+        console.log('error! ' + JSON.stringify(err, undefined, 4));
     });
 });
