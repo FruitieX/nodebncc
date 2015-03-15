@@ -42,19 +42,19 @@ var initChan = function(chanId) {
 };
 
 var handleMessage = function(message) {
-    initChan(message.chanId);
+    initChan(lc(message.chanId));
 
-    state[message.chanId].messages.push(message);
-    io.sockets.in(message.chanId).emit('messages', [message]);
+    state[lc(message.chanId)].messages.push(message);
+    io.sockets.in(lc(message.chanId)).emit('messages', [message]);
     log.debug('got msg on ' + message.chanId + ':', message);
 };
 
 var handleNickList = function(chanId, nickList) {
     log.debug('got nick list for ' + chanId + ':', nickList);
-    initChan(chanId);
+    initChan(lc(chanId));
 
-    state[chanId].nicks = nickList;
-    io.sockets.in(chanId).emit('nickList', [chanId, nickList]);
+    state[lc(chanId)].nicks = nickList;
+    io.sockets.in(lc(chanId)).emit('nickList', [lc(chanId), nickList]);
 };
 
 bncSocket.on('connect', function() {
@@ -75,7 +75,7 @@ bncSocket.on('messages', function(messages) {
 });
 bncSocket.on('nickLists', function(chanIds) {
     _.each(chanIds, function(nickList, chanId) {
-        handleNickList(chanId, nickList);
+        handleNickList(lc(chanId), nickList);
     });
 });
 bncSocket.on('nicks', function(_nicks) {
@@ -112,6 +112,9 @@ var chGetCh = function(chanId) {
     ws = ws !== -1 ? ws : chanId.length;
     return chanId.substr(0, ws).split(':')[1];
 };
+var lc = function(string) {
+    return _.isString(string) ? string.toLowerCase() : undefined;
+};
 
 io.on('connection', function(socket) {
     var curRoom = null;
@@ -120,7 +123,7 @@ io.on('connection', function(socket) {
         bncSocket.emit('message', message);
     });
     socket.on('getChannelState', function(chanId) {
-        io.sockets.in(chanId).emit('messages', state[chanId].messages);
+        io.sockets.in(lc(chanId)).emit('messages', state[lc(chanId)].messages);
     });
     socket.on('room', function(room) {
         log.verbose('client subscribed to ' + room);

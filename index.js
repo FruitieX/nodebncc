@@ -8,8 +8,9 @@ var socket = require('socket.io-client')('http://' + config.hostname + ':' + con
 
 var nicks = {};
 var nick;
+var channel = {};
 
-var chanNumber, server, chan, hideJoinsParts;
+var chanNumber, server, hideJoinsParts;
 
 var updateCompletions = function() {
     var nicksArray = Object.keys(nicks);
@@ -22,6 +23,7 @@ var updateCompletions = function() {
     readline.setCompletions(nicksArray);
 };
 
+/*
 var findChannel = function(searchString) {
     // exact match for server:chan format
     if(searchString.indexOf(':') !== -1) {
@@ -54,9 +56,11 @@ var findChannel = function(searchString) {
         }
     }
 };
+*/
 
 socket.on('connect', function() {
-    socket.emit('room', process.argv[2]);
+    // TODO: get channel via search from daemon
+    socket.emit('room', channel.id);
     redraw();
 });
 socket.on('disconnect', function() {
@@ -241,7 +245,7 @@ var printLine = function(message) {
 // redraw screen
 var redraw = function() {
     process.stdout.write('\u001B[2J\u001B[0;0f'); // clear terminal
-    socket.emit('getChannelState', process.argv[2]); // FIXME
+    socket.emit('getChannelState', channel); // FIXME
     readline.redraw();
 };
 
@@ -409,19 +413,19 @@ var getPrompt = function(chanName, chanNumber) {
     };
 };
 
-var prompt = getPrompt(process.argv[2], 42);
+var prompt = getPrompt(channel, 42);
 
 // parse some select commands from input line
 readline = vimrl(prompt, function(line) {
     if(line === '/bl' || line.substring(0, 4) === '/bl ') {
-        // request backlog
-        sendMsg({
+        // request backlog FIXME
+        socket.emit('message', {
             type: "command",
             server: server,
             message: "PRIVMSG *backlog " + chan + ' ' + line.substring(4)
         });
     } else if(line.substring(0, 4) === '/me ') {
-        // irc ACTION message
+        // irc ACTION message FIXME
         sendMsg({
             type: "action",
             message: line.substring(4),
@@ -430,13 +434,13 @@ readline = vimrl(prompt, function(line) {
             nick: config.myNick
         });
     } else if(line === '/names') {
-        // request nick list
+        // request nick list FIXME
         printLine({
             type: 'nicklist',
             nicks: Object.keys(nicks)
         });
     } else if (line === '/ul') {
-        // list urls in buffer
+        // list urls in buffer FIXME
         sendMsg({
             type: "search",
             type: "urllist",
@@ -448,7 +452,7 @@ readline = vimrl(prompt, function(line) {
             onlyMatching: true
         });
     } else if (line === '/u' || line.substring(0, 3) === '/u ') {
-        // open url
+        // open url FIXME
         sendMsg({
             type: "search",
             type: "openurl",
@@ -461,10 +465,10 @@ readline = vimrl(prompt, function(line) {
         });
     } else if(line.substring(0, 5) === '/say ') {
         // say rest of line
-        sendMsg({
+        sendMsg('message', {
             type: "message",
             message: line.substring(5),
-            chan: chan,
+            channel: chan,
             server: server,
             nick: config.myNick
         });
